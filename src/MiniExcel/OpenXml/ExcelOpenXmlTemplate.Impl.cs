@@ -122,6 +122,20 @@ namespace MiniExcelLibs.OpenXml
             WriteSheetXml(stream, doc, sheetData, mergeCells);
         }
 
+        private void CopySheetXmlImpl(ZipArchiveEntry sheetZipEntry, Stream stream, Stream sheetStream,
+            bool mergeCells = false)
+        {
+            var doc = new XmlDocument();
+            doc.Load(sheetStream);
+            sheetStream.Dispose();
+
+            sheetZipEntry.Delete(); // ZipArchiveEntry can't update directly, so need to delete then create logic
+
+            var sheetData = doc.SelectSingleNode("/x:worksheet/x:sheetData", _ns);
+            var newSheetData = sheetData.Clone(); //avoid delete lost data
+            WriteSheetXml(stream, doc, newSheetData, mergeCells);
+        }
+
         private void GetMercells(XmlDocument doc, XmlNode worksheet)
         {
             var mergeCells = doc.SelectSingleNode($"/x:worksheet/x:mergeCells", _ns);

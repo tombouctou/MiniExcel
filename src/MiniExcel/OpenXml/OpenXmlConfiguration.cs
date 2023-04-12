@@ -1,16 +1,10 @@
-﻿
-using MiniExcelLibs.Utils;
-
-using System.Collections.Generic;
-using System;
-using System.ComponentModel;
-using MiniExcelLibs.Attributes;
+﻿#nullable enable
 
 namespace MiniExcelLibs.OpenXml
 {
     public class OpenXmlConfiguration : Configuration
     {
-        internal static readonly OpenXmlConfiguration DefaultConfig = new OpenXmlConfiguration();
+        internal static readonly OpenXmlConfiguration DefaultConfig = new();
         public bool FillMergedCells { get; set; }
         public TableStyles TableStyles { get; set; } = TableStyles.Default;
         public bool AutoFilter { get; set; } = true;
@@ -18,5 +12,6 @@ namespace MiniExcelLibs.OpenXml
         public bool IgnoreTemplateParameterMissing { get; set; } = true;
         public bool EnableSharedStringCache { get; set; } = true;
         public long SharedStringCacheSize { get; set; } = 5 * 1024 * 1024;
+        public string? Sheet = null;
     }
 }

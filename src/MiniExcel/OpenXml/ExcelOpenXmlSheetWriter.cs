@@ -476,7 +476,7 @@ namespace MiniExcelLibs.OpenXml
                     if (bytes != null)
                     {
                         // TODO: Setting configuration because it might have high cost?
-                        var format = ImageHelper.GetImageFormat(bytes);
+                        var format = ImageHelper.ImageFormat.gif; // unsupported
                         //it can't insert to zip first to avoid cache image to memory
                         //because sheet xml is opening.. https://github.com/shps951023/MiniExcel/issues/304#issuecomment-1017031691
                         //int rowIndex, int cellIndex
