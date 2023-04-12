@@ -2,12 +2,7 @@
 {
     using MiniExcelLibs.Utils;
     using System;
-#if DEBUG
-    public 
-#else
-    internal 
-#endif
-    static class ExcelOpenXmlUtils
+        public static class ExcelOpenXmlUtils
     {
         /// <summary>
         /// Encode to XML (special characteres: &apos; &quot; &gt; &lt; &amp;)

@@ -6,12 +6,7 @@ using System.Text;
 
 namespace MiniExcelLibs.OpenXml
 {
-#if DEBUG
-    public
-#else
-    internal 
-#endif
-    class SharedStringsDiskCache : IDictionary<int, string>, IDisposable
+    public class SharedStringsDiskCache : IDictionary<int, string>, IDisposable
     {
         private readonly FileStream _positionFs;
         private readonly FileStream _lengthFs;

@@ -4,12 +4,7 @@
     using System;
     using System.Globalization;
 
-#if DEBUG
-    public
-#else
-    internal 
-#endif
-    static partial class DateTimeHelper
+        public static partial class DateTimeHelper
     {
         /// <summary>
         /// NumberFormat from NuGet ExcelNumberFormat MIT@License

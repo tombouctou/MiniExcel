@@ -15,7 +15,7 @@ Gitee : https://gitee.com/dotnetchina/MiniExcel
 Issues : https://github.com/mini-software/MiniExcel/issues
 Todo : https://github.com/mini-software/MiniExcel/projects/1?fullscreen=true</Description>
 		<Authors>LIN,WEI-HAN, Mini-Software team, eynarhaji</Authors>
-		<PackageId>MiniExcel</PackageId>
+		<PackageId>MiniExcelT</PackageId>
 		<Copyright>LIN,WEI-HAN, 2021 onwards</Copyright>
 		<NeutralLanguage>en</NeutralLanguage>
 		<license>https://raw.githubusercontent.com/mini-software/MiniExcel/master/LICENSE</license>
