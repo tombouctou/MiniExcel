@@ -131,8 +131,13 @@ namespace MiniExcelLibs.OpenXml
 
             sheetZipEntry.Delete(); // ZipArchiveEntry can't update directly, so need to delete then create logic
 
+            var worksheet = doc.SelectSingleNode("/x:worksheet", _ns);
             var sheetData = doc.SelectSingleNode("/x:worksheet/x:sheetData", _ns);
             var newSheetData = sheetData.Clone(); //avoid delete lost data
+            var rows = newSheetData.SelectNodes($"x:row", _ns);
+            GetMercells(doc, worksheet);
+            Dictionary<string, object> inputMaps = new();
+            UpdateDimensionAndGetRowsInfo(inputMaps, ref doc, ref rows, !mergeCells, ignoreMaps:true);
             WriteSheetXml(stream, doc, newSheetData, mergeCells);
         }
 
@@ -670,7 +675,7 @@ namespace MiniExcelLibs.OpenXml
             }
         }
 
-        private void UpdateDimensionAndGetRowsInfo(Dictionary<string, object> inputMaps, ref XmlDocument doc, ref XmlNodeList rows, bool changeRowIndex = true)
+        private void UpdateDimensionAndGetRowsInfo(Dictionary<string, object> inputMaps, ref XmlDocument doc, ref XmlNodeList rows, bool changeRowIndex = true, bool ignoreMaps = false)
         {
             // note : dimension need to put on the top ![image](https://user-images.githubusercontent.com/12729184/114507911-5dd88400-9c66-11eb-94c6-82ed7bdb5aab.png)
 
@@ -725,19 +730,20 @@ namespace MiniExcelLibs.OpenXml
                         {
                             if (_configuration.IgnoreTemplateParameterMissing)
                             {
-                                v.InnerText = v.InnerText.Replace($"{{{{{propNames[0]}}}}}", "");
+                                if (!ignoreMaps)
+                                    v.InnerText = v.InnerText.Replace($"{{{{{propNames[0]}}}}}", "");
                                 break;
                             }
                             else
                             {
-                                throw new System.Collections.Generic.KeyNotFoundException($"Please check {propNames[0]} parameter, it's not exist.");
+                                throw new KeyNotFoundException($"Please check {propNames[0]} parameter, it's not exist.");
                             }
                         }
 
                         var cellValue = inputMaps[propNames[0]]; // 1. From left to right, only the first set is used as the basis for the list
                         if ((cellValue is IEnumerable || cellValue is IList<object>) && !(cellValue is string))
                         {
-                            if (this.XMergeCellInfos.ContainsKey(r))
+                            if (XMergeCellInfos.ContainsKey(r))
                             {
                                 if (xRowInfo.IEnumerableMercell == null)
                                 {
