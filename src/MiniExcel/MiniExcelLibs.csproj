@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<TargetFrameworks>net6.0</TargetFrameworks>
-		<Version>1.30.2</Version>
+		<Version>1.30.4</Version>
 	</PropertyGroup>
 	<PropertyGroup>
 		<AssemblyName>MiniExcel</AssemblyName>
@@ -9,11 +9,8 @@
 		<Title>MiniExcel</Title>
 		<Product>MiniExcel</Product>
 		<PackageTags>excel;xlsx;csv;micro-helper;mini;openxml;helper;</PackageTags>
-		<Description>Fast, Low-Memory, Easy Excel .NET helper to import/export/template spreadsheet
-Github : https://github.com/mini-software/MiniExcel
-Gitee : https://gitee.com/dotnetchina/MiniExcel
-Issues : https://github.com/mini-software/MiniExcel/issues
-Todo : https://github.com/mini-software/MiniExcel/projects/1?fullscreen=true</Description>
+		<Description>Warning: test package, do not use
+Github : https://github.com/mini-software/MiniExcel</Description>
 		<Authors>LIN,WEI-HAN, Mini-Software team, eynarhaji</Authors>
 		<PackageId>MiniExcelT</PackageId>
 		<Copyright>LIN,WEI-HAN, 2021 onwards</Copyright>

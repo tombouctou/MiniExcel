@@ -94,23 +94,22 @@ namespace MiniExcelLibs.OpenXml
                         var sheetStream = sheet.Open();
                         var fullName = sheet.FullName;
 
-                        if (_configuration.Sheet != null && _configuration.Sheet != string.Empty && sheet.Name != _configuration.Sheet)
+                        XRowInfos = new List<XRowInfo>(); //every time need to use new XRowInfos or it'll cause duplicate problem: https://user-images.githubusercontent.com/12729184/115003101-0fcab700-9ed8-11eb-9151-ca4d7b86d59e.png
+                        XMergeCellInfos = new Dictionary<string, XMergeCell>();
+                        NewXMergeCellInfos = new List<XMergeCell>();
+
+                        if (!string.IsNullOrEmpty(_configuration.Sheet) && sheet.Name != _configuration.Sheet)
                         {
-                            ZipArchiveEntry entryCopy = _archive.zipFile.CreateEntry(fullName);
+                            var entryCopy = _archive.zipFile.CreateEntry(fullName);
                             using var zipStreamCopy = entryCopy.Open();
 
                             CopySheetXmlImpl(sheet, zipStreamCopy, sheetStream);
                             continue;
                         }
-                        this.XRowInfos = new List<XRowInfo>(); //every time need to use new XRowInfos or it'll cause duplicate problem: https://user-images.githubusercontent.com/12729184/115003101-0fcab700-9ed8-11eb-9151-ca4d7b86d59e.png
-                        this.XMergeCellInfos = new Dictionary<string, XMergeCell>();
-                        this.NewXMergeCellInfos = new List<XMergeCell>();
 
-
-                        ZipArchiveEntry entry = _archive.zipFile.CreateEntry(fullName);
+                        var entry = _archive.zipFile.CreateEntry(fullName);
                         using var zipStream = entry.Open();
                         GenerateSheetXmlImpl(sheet, zipStream, sheetStream, values, sharedStrings);
-                        //doc.Save(zipStream); //don't do it beacause : ![image](https://user-images.githubusercontent.com/12729184/114361127-61a5d100-9ba8-11eb-9bb9-34f076ee28a2.png)
                     }
                 }
 

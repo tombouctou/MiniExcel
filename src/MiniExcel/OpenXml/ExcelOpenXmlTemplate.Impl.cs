@@ -135,10 +135,11 @@ namespace MiniExcelLibs.OpenXml
             var sheetData = doc.SelectSingleNode("/x:worksheet/x:sheetData", _ns);
             var newSheetData = sheetData.Clone(); //avoid delete lost data
             var rows = newSheetData.SelectNodes($"x:row", _ns);
+            ReplaceSharedStringsToStr(new Dictionary<int, string>(), ref rows, true);
             GetMercells(doc, worksheet);
             Dictionary<string, object> inputMaps = new();
             UpdateDimensionAndGetRowsInfo(inputMaps, ref doc, ref rows, !mergeCells, ignoreMaps:true);
-            WriteSheetXml(stream, doc, newSheetData, mergeCells);
+            WriteSheetXml(stream, doc, sheetData, mergeCells);
         }
 
         private void GetMercells(XmlDocument doc, XmlNode worksheet)
@@ -648,7 +649,7 @@ namespace MiniExcelLibs.OpenXml
                 .ToString();
         }
 
-        private void ReplaceSharedStringsToStr(IDictionary<int, string> sharedStrings, ref XmlNodeList rows)
+        private void ReplaceSharedStringsToStr(IDictionary<int, string> sharedStrings, ref XmlNodeList rows, bool ignore = false)
         {
             foreach (XmlElement row in rows)
             {
@@ -803,8 +804,8 @@ namespace MiniExcelLibs.OpenXml
                             var prop = xRowInfo.PropsMap[propNames[1]];
                             var type = prop.UnderlyingTypePropType; //avoid nullable 
                                                                     // 
-                            if (!xRowInfo.PropsMap.ContainsKey(propNames[1]))
-                                throw new InvalidDataException($"{propNames[0]} doesn't have {propNames[1]} property");
+                            //if (!xRowInfo.PropsMap.ContainsKey(propNames[1]))
+                                //throw new InvalidDataException($"{propNames[0]} doesn't have {propNames[1]} property");
 
                             if (isMultiMatch)
                             {
