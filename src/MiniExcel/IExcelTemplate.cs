@@ -7,7 +7,7 @@ namespace MiniExcelLibs
     internal interface IExcelTemplate
     {
         void SaveAsByTemplate(string templatePath, object value);
-        void SaveAsByTemplate(byte[] templateBtyes, object value);
+        void SaveAsByTemplate(byte[] templateBytes, object value);
         void MergeSameCells(string path);
         void MergeSameCells(byte[] fileInBytes);
     }

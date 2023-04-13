@@ -135,7 +135,7 @@ namespace MiniExcelLibs.OpenXml
             var sheetData = doc.SelectSingleNode("/x:worksheet/x:sheetData", _ns);
             var newSheetData = sheetData.Clone(); //avoid delete lost data
             var rows = newSheetData.SelectNodes($"x:row", _ns);
-            ReplaceSharedStringsToStr(new Dictionary<int, string>(), ref rows, true);
+            ReplaceSharedStringsToStr(new Dictionary<int, string>(), ref rows);
             GetMercells(doc, worksheet);
             Dictionary<string, object> inputMaps = new();
             UpdateDimensionAndGetRowsInfo(inputMaps, ref doc, ref rows, !mergeCells, ignoreMaps:true);
@@ -295,25 +295,28 @@ namespace MiniExcelLibs.OpenXml
                         prevHeader = "";
                         continue;
                     }
-                    else if (row.InnerText.Contains("@endgroup"))
+                    else
                     {
-                        if(cellIEnumerableValuesIndex >= cellIEnumerableValues.Count - 1)
+                        if (row.InnerText.Contains("@endgroup"))
                         {
-                            groupingStarted = false;
-                            groupStartRowIndex = 0;
-                            cellIEnumerableValues = null;
-                            isCellIEnumerableValuesSet = false;
-                            headerDiff++;
+                            if(cellIEnumerableValuesIndex >= cellIEnumerableValues.Count - 1)
+                            {
+                                groupingStarted = false;
+                                groupStartRowIndex = 0;
+                                cellIEnumerableValues = null;
+                                isCellIEnumerableValuesSet = false;
+                                headerDiff++;
+                                continue;
+                            }
+                            rowNo = groupStartRowIndex;
+                            cellIEnumerableValuesIndex++;
+                            isFirstRound = false;
                             continue;
                         }
-                        rowNo = groupStartRowIndex;
-                        cellIEnumerableValuesIndex++;
-                        isFirstRound = false;
-                        continue;
-                    }
-                    else if (row.InnerText.Contains("@header"))
-                    {
-                        isHeaderRow = true;
+                        if (row.InnerText.Contains("@header"))
+                        {
+                            isHeaderRow = true;
+                        }
                     }
 
                     if (groupingStarted && !isCellIEnumerableValuesSet && rowInfo.CellIlListValues != null)
@@ -370,6 +373,10 @@ namespace MiniExcelLibs.OpenXml
                                   .Append(innerXml)
                                   .Replace($"{{{{$rowindex}}}}", newRowIndex.ToString())
                                   .AppendFormat(@"</{0}>", row.Name);
+                            if (iEnumerableIndex > 1 && rowInfo.PropsMap.Count > 0)
+                            {
+                                rowXml = ShiftFormulasBelow(rowXml, iEnumerableIndex - 1);
+                            }
 
                             if (rowInfo.IsDictionary)
                             {
@@ -613,6 +620,72 @@ namespace MiniExcelLibs.OpenXml
             }
         }
 
+        public static Stream ToStream(string str)
+        {
+            var stream = new MemoryStream();
+            var writer = new StreamWriter(stream);
+            writer.Write(str);
+            writer.Flush();
+            stream.Position = 0;
+            return stream;
+        }
+
+        private StringBuilder ShiftFormulasBelow(StringBuilder rowXml, int shiftTo)
+        {
+            var doc = new XmlDocument();
+            XmlReaderSettings settings = new XmlReaderSettings { NameTable = new NameTable() };
+            XmlNamespaceManager xmlns = new XmlNamespaceManager(settings.NameTable);
+            xmlns.AddNamespace("xsi", "http://www.w3.org/2001/XMLSchema-instance");
+            xmlns.AddNamespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");
+            xmlns.AddNamespace("mc", "http://schemas.openxmlformats.org/markup-compatibility/2006");
+            xmlns.AddNamespace("x14ac", "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac");
+            XmlParserContext context = new XmlParserContext(null, xmlns, "", XmlSpace.Default);
+            XmlReader reader = XmlReader.Create(ToStream(rowXml.ToString()), settings, context);
+            doc.Load(reader);
+
+            foreach (var o in doc)
+            {
+                if (o is not XmlElement { Name: "row" } element) continue;
+                foreach (var elementChildNode in element.ChildNodes)
+                {
+                    if (elementChildNode is not XmlElement { Name: "c" } cell) continue;
+                    foreach (var cellChildNode in cell.ChildNodes)
+                    {
+                        if (cellChildNode is XmlElement { Name: "f" } childElement)
+                        {
+                            childElement.InnerText = UpdateFormula(childElement.InnerText, shiftTo);
+                        }
+                    }
+                }
+            }
+
+            MemoryStream ms = new();
+            doc.Save(ms);
+            var docStr = ReadToEnd(ms);
+            return new StringBuilder(docStr);
+        }
+        private static string ReadToEnd(MemoryStream str)
+        {
+            str.Position = 0;
+            var r = new StreamReader(str);
+            return r.ReadToEnd();
+        }
+
+        private const string RxCell = "(?<prefix>\\$|\\!)?\\b(?<cell>(?<let>[A-Z])(?<num>[0-9])+)";
+
+        private static string UpdateFormula(string childElementInnerText, int shiftTo)
+        {
+            var rx = new Regex(RxCell);
+            var newText = rx.Replace(childElementInnerText, m =>
+            {
+                if (m.Groups.ContainsKey("prefix") && m.Groups["prefix"].Value.Length > 0)
+                    return m.Value;
+                var num = int.Parse(m.Groups["num"].Value);
+                return m.Groups["let"].Value + (num + shiftTo);
+            });
+            return newText;
+        }
+
         private static string ConvertToDateTimeString(KeyValuePair<string, PropInfo> propInfo, object cellValue)
         {
             string cellValueStr;
@@ -649,29 +722,27 @@ namespace MiniExcelLibs.OpenXml
                 .ToString();
         }
 
-        private void ReplaceSharedStringsToStr(IDictionary<int, string> sharedStrings, ref XmlNodeList rows, bool ignore = false)
+        private void ReplaceSharedStringsToStr(IDictionary<int, string> sharedStrings, ref XmlNodeList rows)
         {
             foreach (XmlElement row in rows)
             {
-                var cs = row.SelectNodes($"x:c", _ns);
-                foreach (XmlElement c in cs)
+                var columns = row.SelectNodes($"x:c", _ns);
+                if (columns == null)
+                    continue;
+                foreach (XmlElement c in columns)
                 {
                     var t = c.GetAttribute("t");
                     var v = c.SelectSingleNode("x:v", _ns);
                     if (v == null || v.InnerText == null) //![image](https://user-images.githubusercontent.com/12729184/114363496-075a3f80-9bab-11eb-9883-8e3fec10765c.png)
                         continue;
 
-                    if (t == "s")
-                    {
-                        //need to check sharedstring exist or not
-                        if (sharedStrings.ContainsKey(int.Parse(v.InnerText)))
-                        {
-                            v.InnerText = sharedStrings[int.Parse(v.InnerText)];
-                            // change type = str and replace its value
-                            c.SetAttribute("t", "str");
-                        }
-                        //TODO: remove sharedstring? 
-                    }
+                    if (t != "s") continue;
+                    //need to check sharedstring exist or not
+                    if (!sharedStrings.ContainsKey(int.Parse(v.InnerText))) continue;
+                    v.InnerText = sharedStrings[int.Parse(v.InnerText)];
+                    // change type = str and replace its value
+                    c.SetAttribute("t", "str");
+                    //TODO: remove sharedstring? 
                 }
             }
         }
@@ -684,6 +755,7 @@ namespace MiniExcelLibs.OpenXml
             if (dimension == null)
                 throw new NotImplementedException("Excel Dimension Xml is null, please issue file for me. https://github.com/shps951023/MiniExcel/issues");
             var maxRowIndexDiff = 0;
+            int rowCount = rows.Count;
             foreach (XmlElement row in rows)
             {
                 // ==== get ienumerable infomation & maxrowindexdiff ====
@@ -695,6 +767,7 @@ namespace MiniExcelLibs.OpenXml
                     Row = row
                 };
                 XRowInfos.Add(xRowInfo);
+                bool rowContainsObjectLink = false;
                 foreach (XmlElement c in row.SelectNodes($"x:c", _ns))
                 {
                     var r = c.GetAttribute("r");
@@ -713,13 +786,14 @@ namespace MiniExcelLibs.OpenXml
                     }
 
                     var v = c.SelectSingleNode("x:v", _ns);
+                    var f = c.SelectSingleNode("x:f", _ns);
                     if (v?.InnerText == null)
                         continue;
 
-                    var matchs = (_isExpressionRegex.Matches(v.InnerText).Cast<Match>().GroupBy(x => x.Value).Select(varGroup => varGroup.First().Value)).ToArray();
-                    var matchCnt = matchs.Length;
-                    var isMultiMatch = matchCnt > 1 || (matchCnt == 1 && v.InnerText != $"{{{{{matchs[0]}}}}}");
-                    foreach (var formatText in matchs)
+                    var matches = _isExpressionRegex.Matches(v.InnerText).GroupBy(x => x.Value).Select(varGroup => varGroup.First().Value).ToArray();
+                    var matchCnt = matches.Length;
+                    var isMultiMatch = matchCnt > 1 || (matchCnt == 1 && v.InnerText != $"{{{{{matches[0]}}}}}");
+                    foreach (var formatText in matches)
                     {
                         xRowInfo.FormatText = formatText;
                         var propNames = formatText.Split('.');
@@ -754,7 +828,8 @@ namespace MiniExcelLibs.OpenXml
                             
                             xRowInfo.CellIEnumerableValues = cellValue as IEnumerable;
                             xRowInfo.CellIlListValues = cellValue as IList<object>;
-                            
+                            rowContainsObjectLink = true;
+
                             // get ienumerable runtime type
                             if (xRowInfo.IEnumerableGenricType == null) //avoid duplicate to add rowindexdiff ![image](https://user-images.githubusercontent.com/12729184/114851348-522ac000-9e14-11eb-8244-4730754d6885.png)
                             {
@@ -826,7 +901,8 @@ namespace MiniExcelLibs.OpenXml
 
                             break;
                         }
-                        else if (cellValue is DataTable)
+
+                        if (cellValue is DataTable)
                         {
                             var dt = cellValue as DataTable;
                             if (xRowInfo.CellIEnumerableValues == null)
@@ -847,8 +923,8 @@ namespace MiniExcelLibs.OpenXml
                                 //TODO:need to optimize
                                 //maxRowIndexDiff = dt.Rows.Count <= 1 ? 0 : dt.Rows.Count-1;
                                 xRowInfo.PropsMap = dt.Columns.Cast<DataColumn>().ToDictionary(col => col.ColumnName, col =>
-                                new PropInfo { UnderlyingTypePropType = Nullable.GetUnderlyingType(col.DataType) }
-                            );
+                                    new PropInfo { UnderlyingTypePropType = Nullable.GetUnderlyingType(col.DataType) }
+                                );
                             }
 
                             var column = dt.Columns[propNames[1]];

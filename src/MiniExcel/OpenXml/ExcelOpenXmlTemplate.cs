@@ -1,23 +1,22 @@
 ﻿
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Xml;
+using MiniExcelLibs.Utils;
+using MiniExcelLibs.Zip;
+
 namespace MiniExcelLibs.OpenXml
 {
-    using MiniExcelLibs.Utils;
-    using MiniExcelLibs.Zip;
-    using System;
-    using System.Collections;
-    using System.Collections.Generic;
-    using System.Data;
-    using System.IO;
-    using System.IO.Compression;
-    using System.Linq;
-    using System.Reflection;
-    using System.Text;
-    using System.Text.RegularExpressions;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using System.Xml;
-
-    internal partial class ExcelOpenXmlTemplate : IExcelTemplate, IExcelTemplateAsync
+    internal partial class ExcelOpenXmlTemplate : IExcelTemplateAsync
     {
         private static readonly XmlNamespaceManager _ns;
         private static readonly Regex _isExpressionRegex;
@@ -39,28 +38,28 @@ namespace MiniExcelLibs.OpenXml
 
         public void SaveAsByTemplate(string templatePath, object value)
         {
-            using (var stream = FileHelper.OpenSharedRead(templatePath))
-                SaveAsByTemplateImpl(stream, value);
+            using var stream = FileHelper.OpenSharedRead(templatePath);
+            SaveAsByTemplateImpl(stream, value);
         }
-        public void SaveAsByTemplate(byte[] templateBtyes, object value)
+        public void SaveAsByTemplate(byte[] templateBytes, object value)
         {
-            using (Stream stream = new MemoryStream(templateBtyes))
-                SaveAsByTemplateImpl(stream, value);
+            using Stream stream = new MemoryStream(templateBytes);
+            SaveAsByTemplateImpl(stream, value);
         }
 
         public void SaveAsByTemplateImpl(Stream templateStream, object value)
         {
             //only support xlsx         
             Dictionary<string, object> values;
-            if (value is Dictionary<string, object>)
+            if (value is Dictionary<string, object> objects)
             {
-                values = value as Dictionary<string, object>;
+                values = objects;
                 foreach (var key in values.Keys)
                 {
                     var v = values[key];
-                    if (v is IDataReader)
+                    if (v is IDataReader reader)
                     {
-                        values[key] = TypeHelper.ConvertToEnumerableDictionary(v as IDataReader).ToList();
+                        values[key] = TypeHelper.ConvertToEnumerableDictionary(reader).ToList();
                     }
                 }
             }
@@ -68,24 +67,20 @@ namespace MiniExcelLibs.OpenXml
             {
                 var type = value.GetType();
                 var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-                values = new Dictionary<string, object>();
-                foreach (var p in props)
-                {
-                    values.Add(p.Name, p.GetValue(value));
-                }
+                values = props.ToDictionary(p => p.Name, p => p.GetValue(value));
             }
 
             {
                 templateStream.CopyTo(_stream);
 
                 var reader = new ExcelOpenXmlSheetReader(_stream,null);
-                var _archive = new ExcelOpenXmlZip(_stream, mode: ZipArchiveMode.Update, true, Encoding.UTF8);
+                var archive = new ExcelOpenXmlZip(_stream, mode: ZipArchiveMode.Update, true, Encoding.UTF8);
                 {
                     //read sharedString
                     var sharedStrings = reader._sharedStrings;
 
                     //read all xlsx sheets
-                    var sheets = _archive.zipFile.Entries.Where(w => w.FullName.StartsWith("xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase)
+                    var sheets = archive.zipFile.Entries.Where(w => w.FullName.StartsWith("xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase)
                         || w.FullName.StartsWith("/xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase)
                     ).ToList();
 
@@ -100,20 +95,20 @@ namespace MiniExcelLibs.OpenXml
 
                         if (!string.IsNullOrEmpty(_configuration.Sheet) && sheet.Name != _configuration.Sheet)
                         {
-                            var entryCopy = _archive.zipFile.CreateEntry(fullName);
+                            var entryCopy = archive.zipFile.CreateEntry(fullName);
                             using var zipStreamCopy = entryCopy.Open();
 
                             CopySheetXmlImpl(sheet, zipStreamCopy, sheetStream);
                             continue;
                         }
 
-                        var entry = _archive.zipFile.CreateEntry(fullName);
+                        var entry = archive.zipFile.CreateEntry(fullName);
                         using var zipStream = entry.Open();
                         GenerateSheetXmlImpl(sheet, zipStream, sheetStream, values, sharedStrings);
                     }
                 }
 
-                _archive.zipFile.Dispose();
+                archive.zipFile.Dispose();
             }
         }
 

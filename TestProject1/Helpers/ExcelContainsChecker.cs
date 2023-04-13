@@ -31,7 +31,6 @@ public static class ExcelContainsChecker
 
             do
             {
-                var sheetName = reader.Name;
                 var colCount = reader.FieldCount;
 
                 while (reader.Read())
