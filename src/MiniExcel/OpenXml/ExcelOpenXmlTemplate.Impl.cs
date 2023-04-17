@@ -630,17 +630,23 @@ namespace MiniExcelLibs.OpenXml
             return stream;
         }
 
-        private StringBuilder ShiftFormulasBelow(StringBuilder rowXml, int shiftTo)
+        private static StringBuilder ShiftFormulasBelow(StringBuilder rowXml, int shiftTo)
         {
             var doc = new XmlDocument();
-            XmlReaderSettings settings = new XmlReaderSettings { NameTable = new NameTable() };
-            XmlNamespaceManager xmlns = new XmlNamespaceManager(settings.NameTable);
+            var settings = new XmlReaderSettings { NameTable = new NameTable() };
+            var xmlns = new XmlNamespaceManager(settings.NameTable);
             xmlns.AddNamespace("xsi", "http://www.w3.org/2001/XMLSchema-instance");
             xmlns.AddNamespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships");
             xmlns.AddNamespace("mc", "http://schemas.openxmlformats.org/markup-compatibility/2006");
             xmlns.AddNamespace("x14ac", "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac");
-            XmlParserContext context = new XmlParserContext(null, xmlns, "", XmlSpace.Default);
-            XmlReader reader = XmlReader.Create(ToStream(rowXml.ToString()), settings, context);
+            xmlns.AddNamespace("x15", "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main");
+            xmlns.AddNamespace("xr", "http://schemas.microsoft.com/office/spreadsheetml/2014/revision");
+            xmlns.AddNamespace("xr6", "http://schemas.microsoft.com/office/spreadsheetml/2016/revision6");
+            xmlns.AddNamespace("xr10", "http://schemas.microsoft.com/office/spreadsheetml/2016/revision10");
+            xmlns.AddNamespace("xr2", "http://schemas.microsoft.com/office/spreadsheetml/2015/revision2");
+            xmlns.AddNamespace("x", "urn:schemas-microsoft-com:office:excel");
+            var context = new XmlParserContext(null, xmlns, "", XmlSpace.Default);
+            var reader = XmlReader.Create(ToStream(rowXml.ToString()), settings, context);
             doc.Load(reader);
 
             foreach (var o in doc)
@@ -664,7 +670,7 @@ namespace MiniExcelLibs.OpenXml
             var docStr = ReadToEnd(ms);
             return new StringBuilder(docStr);
         }
-        private static string ReadToEnd(MemoryStream str)
+        private static string ReadToEnd(Stream str)
         {
             str.Position = 0;
             var r = new StreamReader(str);
@@ -849,7 +855,7 @@ namespace MiniExcelLibs.OpenXml
                                             {
                                                 xRowInfo.IsDictionary = true;
                                                 var dic = element as IDictionary<string, object>;
-                                                xRowInfo.PropsMap = dic.Keys.ToDictionary(key => key, key => dic[key] != null
+                                                xRowInfo.PropsMap = dic.Keys.ToDictionary(key => key, key => dic.ContainsKey(key) && dic[key] != null
                                                     ? new PropInfo { UnderlyingTypePropType = Nullable.GetUnderlyingType(dic[key].GetType()) ?? dic[key].GetType() }
                                                     : new PropInfo { UnderlyingTypePropType = typeof(object) });
                                             }
@@ -876,27 +882,30 @@ namespace MiniExcelLibs.OpenXml
                                 break;
                             }
                             // auto check type https://github.com/shps951023/MiniExcel/issues/177
-                            var prop = xRowInfo.PropsMap[propNames[1]];
-                            var type = prop.UnderlyingTypePropType; //avoid nullable 
-                                                                    // 
-                            //if (!xRowInfo.PropsMap.ContainsKey(propNames[1]))
+                            if (xRowInfo.PropsMap.ContainsKey(propNames[1]))
+                            {
+                                var prop = xRowInfo.PropsMap[propNames[1]];
+                                var type = prop.UnderlyingTypePropType; //avoid nullable 
+                                // 
+                                //if (!xRowInfo.PropsMap.ContainsKey(propNames[1]))
                                 //throw new InvalidDataException($"{propNames[0]} doesn't have {propNames[1]} property");
 
-                            if (isMultiMatch)
-                            {
-                                c.SetAttribute("t", "str");
-                            }
-                            else if (TypeHelper.IsNumericType(type))
-                            {
-                                c.SetAttribute("t", "n");
-                            }
-                            else if (Type.GetTypeCode(type) == TypeCode.Boolean)
-                            {
-                                c.SetAttribute("t", "b");
-                            }
-                            else if (Type.GetTypeCode(type) == TypeCode.DateTime)
-                            {
-                                c.SetAttribute("t", "str");
+                                if (isMultiMatch)
+                                {
+                                    c.SetAttribute("t", "str");
+                                }
+                                else if (TypeHelper.IsNumericType(type))
+                                {
+                                    c.SetAttribute("t", "n");
+                                }
+                                else if (Type.GetTypeCode(type) == TypeCode.Boolean)
+                                {
+                                    c.SetAttribute("t", "b");
+                                }
+                                else if (Type.GetTypeCode(type) == TypeCode.DateTime)
+                                {
+                                    c.SetAttribute("t", "str");
+                                }
                             }
 
                             break;
