@@ -15,7 +15,7 @@ namespace MiniExcelLibs
     internal interface IExcelTemplateAsync : IExcelTemplate
     {
         Task SaveAsByTemplateAsync(string templatePath, object value,CancellationToken cancellationToken = default(CancellationToken));
-        Task SaveAsByTemplateAsync(byte[] templateBtyes, object value,CancellationToken cancellationToken = default(CancellationToken));
+        Task SaveAsByTemplateAsync(byte[] templateBytes, object value,CancellationToken cancellationToken = default(CancellationToken));
         Task MergeSameCellsAsync(string path, CancellationToken cancellationToken = default(CancellationToken));
         Task MergeSameCellsAsync(byte[] fileInBytes, CancellationToken cancellationToken = default(CancellationToken));
     }

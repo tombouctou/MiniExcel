@@ -117,9 +117,9 @@ namespace MiniExcelLibs.OpenXml
             return Task.Run(() => SaveAsByTemplate(templatePath, value),cancellationToken);
         }
 
-        public Task SaveAsByTemplateAsync(byte[] templateBtyes, object value,CancellationToken cancellationToken = default(CancellationToken))
+        public Task SaveAsByTemplateAsync(byte[] templateBytes, object value,CancellationToken cancellationToken = default(CancellationToken))
         {
-            return Task.Run(() => SaveAsByTemplate(templateBtyes, value),cancellationToken);
+            return Task.Run(() => SaveAsByTemplate(templateBytes, value),cancellationToken);
         }
     }
 }
