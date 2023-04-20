@@ -341,16 +341,16 @@ namespace MiniExcelLibs.OpenXml
                 var originRowIndex = int.Parse(row.GetAttribute("r"));
                 var newRowIndex = originRowIndex + rowIndexDiff + groupingRowDiff;
 
-                string innerXml = row.InnerXml;
+                var innerXml = row.InnerXml;
                 rowXml.Clear()
-                    .AppendFormat(@"<{0}", row.Name);
+                    .Append($@"<{row.Name}");
                 foreach (var attr in row.Attributes.Cast<XmlAttribute>()
                              .Where(e => e.Name != "r"))
                 {
-                    rowXml.AppendFormat(@" {0}=""{1}""", attr.Name, attr.Value);
+                    rowXml.Append($@" {attr.Name}=""{attr.Value}""");
                 }
 
-                string outerXmlOpen = rowXml.ToString();
+                var outerXmlOpen = rowXml.ToString();
 
                 if (rowInfo.CellIEnumerableValues != null)
                 {
@@ -521,49 +521,47 @@ namespace MiniExcelLibs.OpenXml
                         first = false;
 
                         var mergeBaseRowIndex = newRowIndex;
-                        newRowIndex += (rowInfo.IEnumerableMercell?.Height ?? 1);
+                        newRowIndex += rowInfo.IEnumerableMercell?.Height ?? 1;
                         writer.Write(CleanXml(rowXml.ToString().Replace("xmlns:x=\"urn:schemas-microsoft-com:office:excel\"", ""), endPrefix)); // pass StringBuilder for netcoreapp3.0 or above
 
                         //mergecells
-                        if (rowInfo.RowMercells != null)
+                        if (rowInfo.RowMercells == null) continue;
+
+                        foreach (var newMergeCell in rowInfo.RowMercells.Select(mergeCell => new XMergeCell(mergeCell)))
                         {
-                            foreach (var mergeCell in rowInfo.RowMercells)
+                            newMergeCell.Y1 = newMergeCell.Y1 + rowIndexDiff + groupingRowDiff;
+                            newMergeCell.Y2 = newMergeCell.Y2 + rowIndexDiff + groupingRowDiff;
+                            NewXMergeCellInfos.Add(newMergeCell);
+                        }
+
+                        // Last merge one don't add new row, or it'll get duplicate result like : https://github.com/shps951023/MiniExcel/issues/207#issuecomment-824550950
+                        if (iEnumerableIndex == rowInfo.CellIEnumerableValuesCount)
+                            continue;
+
+                        if (rowInfo.IEnumerableMercell != null)
+                            continue;
+
+                        // https://github.com/shps951023/MiniExcel/issues/207#issuecomment-824518897
+                        for (int i = 1; i < rowInfo.IEnumerableMercell.Height; i++)
+                        {
+                            mergeBaseRowIndex++;
+                            var _newRow = row.Clone() as XmlElement;
+                            _newRow.SetAttribute("r", mergeBaseRowIndex.ToString());
+
+                            var cs = _newRow.SelectNodes("x:c", _ns);
+                            // all v replace by empty
+                            // TODO: remove c/v
+                            foreach (XmlElement _c in cs)
                             {
-                                var newMergeCell = new XMergeCell(mergeCell);
-                                newMergeCell.Y1 = newMergeCell.Y1 + rowIndexDiff + groupingRowDiff;
-                                newMergeCell.Y2 = newMergeCell.Y2 + rowIndexDiff + groupingRowDiff;
-                                NewXMergeCellInfos.Add(newMergeCell);
-                            }
-
-                            // Last merge one don't add new row, or it'll get duplicate result like : https://github.com/shps951023/MiniExcel/issues/207#issuecomment-824550950
-                            if (iEnumerableIndex == rowInfo.CellIEnumerableValuesCount)
-                                continue;
-
-                            if (rowInfo.IEnumerableMercell != null)
-                                continue;
-
-                            // https://github.com/shps951023/MiniExcel/issues/207#issuecomment-824518897
-                            for (int i = 1; i < rowInfo.IEnumerableMercell.Height; i++)
-                            {
-                                mergeBaseRowIndex++;
-                                var _newRow = row.Clone() as XmlElement;
-                                _newRow.SetAttribute("r", mergeBaseRowIndex.ToString());
-
-                                var cs = _newRow.SelectNodes("x:c", _ns);
-                                // all v replace by empty
-                                // TODO: remove c/v
-                                foreach (XmlElement _c in cs)
+                                _c.RemoveAttribute("t");
+                                foreach (XmlNode ch in _c.ChildNodes)
                                 {
-                                    _c.RemoveAttribute("t");
-                                    foreach (XmlNode ch in _c.ChildNodes)
-                                    {
-                                        _c.RemoveChild(ch);
-                                    }
+                                    _c.RemoveChild(ch);
                                 }
-
-                                _newRow.InnerXml = new StringBuilder(_newRow.InnerXml).Replace("{{$rowindex}}", mergeBaseRowIndex.ToString()).ToString();
-                                writer.Write(CleanXml(_newRow.OuterXml, endPrefix));
                             }
+
+                            _newRow.InnerXml = new StringBuilder(_newRow.InnerXml).Replace("{{$rowindex}}", mergeBaseRowIndex.ToString()).ToString();
+                            writer.Write(CleanXml(_newRow.OuterXml, endPrefix));
                         }
                     }
                 }
@@ -746,7 +744,19 @@ namespace MiniExcelLibs.OpenXml
             // note : dimension need to put on the top ![image](https://user-images.githubusercontent.com/12729184/114507911-5dd88400-9c66-11eb-94c6-82ed7bdb5aab.png)
 
             if (doc.SelectSingleNode("/x:worksheet/x:dimension", _ns) is not XmlElement dimension)
-                throw new NotImplementedException("Excel Dimension Xml is null, please issue file for me. https://github.com/shps951023/MiniExcel/issues");
+            {
+                dimension = doc.CreateElement("dimension", "http://schemas.openxmlformats.org/spreadsheetml/2006/main");
+                var attr = doc.CreateAttribute("ref");
+                attr.Value = "A1:V1000";
+                dimension.Attributes.Append(attr);
+
+                if (doc.SelectSingleNode("/x:worksheet/x:autoFilter", _ns)! is XmlElement autoFilter)
+                {
+                    doc.SelectSingleNode("/x:worksheet", _ns)!.RemoveChild(autoFilter);
+                }
+
+                // doc.SelectSingleNode("/x:worksheet", _ns)!.PrependChild(dimension);
+            }
 
             var maxRowIndexDiff = 0;
 
@@ -782,7 +792,7 @@ namespace MiniExcelLibs.OpenXml
                     if (v?.InnerText == null || f != null)
                         continue;
 
-                    var matches = _isExpressionRegex.Matches(v.InnerText).GroupBy(x => x.Value).Select(varGroup => varGroup.First().Value).ToArray();
+                    var matches = IsExpressionRegex.Matches(v.InnerText).GroupBy(x => x.Value).Select(varGroup => varGroup.First().Value).ToArray();
                     var matchCnt = matches.Length;
                     var isMultiMatch = matchCnt > 1 || (matchCnt == 1 && v.InnerText != $"{{{{{matches[0]}}}}}");
                     foreach (var formatText in matches)

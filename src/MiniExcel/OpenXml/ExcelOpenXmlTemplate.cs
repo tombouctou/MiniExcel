@@ -19,10 +19,10 @@ namespace MiniExcelLibs.OpenXml
     internal partial class ExcelOpenXmlTemplate : IExcelTemplateAsync
     {
         private static readonly XmlNamespaceManager _ns;
-        private static readonly Regex _isExpressionRegex;
+        private static readonly Regex IsExpressionRegex;
         static ExcelOpenXmlTemplate()
         {
-            _isExpressionRegex = new Regex("(?<={{).*?(?=}})");
+            IsExpressionRegex = new Regex("(?<={{).*?(?=}})");
             _ns = new XmlNamespaceManager(new NameTable());
             _ns.AddNamespace("x", Config.SpreadsheetmlXmlns);
         }
