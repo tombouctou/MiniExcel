@@ -1,9 +1,8 @@
-using MiniExcelLibs.Attributes;
-using MiniExcelLibs.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -11,6 +10,8 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
+using MiniExcelLibs.Attributes;
+using MiniExcelLibs.Utils;
 
 namespace MiniExcelLibs.OpenXml
 {
@@ -42,15 +43,15 @@ namespace MiniExcelLibs.OpenXml
         {
             public XMergeCell(XMergeCell mergeCell)
             {
-                this.Width = mergeCell.Width;
-                this.Height = mergeCell.Height;
-                this.X1 = mergeCell.X1;
-                this.Y1 = mergeCell.Y1;
-                this.X2 = mergeCell.X2;
-                this.Y2 = mergeCell.Y2;
-                this.MergeCell = mergeCell.MergeCell;
+                Width = mergeCell.Width;
+                Height = mergeCell.Height;
+                X1 = mergeCell.X1;
+                Y1 = mergeCell.Y1;
+                X2 = mergeCell.X2;
+                Y2 = mergeCell.Y2;
+                MergeCell = mergeCell.MergeCell;
             }
-            public XMergeCell(XmlElement mergeCell)
+            public XMergeCell(XmlNode mergeCell)
             {
                 var @ref = mergeCell.Attributes["ref"].Value;
                 var refs = @ref.Split(':');
@@ -133,7 +134,7 @@ namespace MiniExcelLibs.OpenXml
             var worksheet = doc.SelectSingleNode("/x:worksheet", _ns);
             var sheetData = doc.SelectSingleNode("/x:worksheet/x:sheetData", _ns);
             var newSheetData = sheetData.Clone(); //avoid delete lost data
-            var rows = newSheetData.SelectNodes($"x:row", _ns);
+            var rows = newSheetData.SelectNodes("x:row", _ns);
             ReplaceSharedStringsToStr(new Dictionary<int, string>(), ref rows);
             GetMercells(doc, worksheet);
             Dictionary<string, object> inputMaps = new();
@@ -143,7 +144,7 @@ namespace MiniExcelLibs.OpenXml
 
         private void GetMercells(XmlDocument doc, XmlNode worksheet)
         {
-            var mergeCells = doc.SelectSingleNode($"/x:worksheet/x:mergeCells", _ns);
+            var mergeCells = doc.SelectSingleNode("/x:worksheet/x:mergeCells", _ns);
 
             if (mergeCells == null) return;
 
@@ -184,7 +185,7 @@ namespace MiniExcelLibs.OpenXml
             sheetData.InnerText = "{{{{{{split}}}}}}"; //TODO: bad code smell
             var prefix = string.IsNullOrEmpty(sheetData.Prefix) ? "" : $"{sheetData.Prefix}:";
             var endPrefix = string.IsNullOrEmpty(sheetData.Prefix) ? "" : $":{sheetData.Prefix}"; //![image](https://user-images.githubusercontent.com/12729184/115000066-fd02b300-9ed4-11eb-8e65-bf0014015134.png)
-            var contents = doc.InnerXml.Split(new string[] { $"<{prefix}sheetData>{{{{{{{{{{{{split}}}}}}}}}}}}</{prefix}sheetData>" }, StringSplitOptions.None);
+            var contents = doc.InnerXml.Split(new[] { $"<{prefix}sheetData>{{{{{{{{{{{{split}}}}}}}}}}}}</{prefix}sheetData>" }, StringSplitOptions.None);
             using var writer = new StreamWriter(stream, Encoding.UTF8);
             writer.Write(contents[0]);
             writer.Write($"<{prefix}sheetData>"); // prefix problem
@@ -197,7 +198,7 @@ namespace MiniExcelLibs.OpenXml
                     .Where(s => !string.IsNullOrEmpty(s.InnerText)).Select(s =>
                     {
                         var att = s.GetAttribute("r");
-                        return new XChildNode()
+                        return new XChildNode
                         {
                             InnerText = s.InnerText,
                             ColIndex = StringHelper.GetLetter(att),
@@ -364,7 +365,7 @@ namespace MiniExcelLibs.OpenXml
                             .Append(outerXmlOpen)
                             .Append($@" r=""{newRowIndex}"">")
                             .Append(innerXml)
-                            .Replace($"{{{{$rowindex}}}}", newRowIndex.ToString())
+                            .Replace("{{$rowindex}}", newRowIndex.ToString())
                             .Append($@"</{row.Name}>");
                         if (iEnumerableIndex > 1 && rowInfo.PropsMap.Count > 0)
                         {
@@ -488,7 +489,7 @@ namespace MiniExcelLibs.OpenXml
                                 else if (TypeHelper.IsNumericType(type))
                                 {
                                     if (decimal.TryParse(cellValueStr, out var decimalValue))
-                                        cellValueStr = decimalValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                                        cellValueStr = decimalValue.ToString(CultureInfo.InvariantCulture);
                                 }
 
                                 //TODO: ![image](https://user-images.githubusercontent.com/12729184/114848248-17735880-9e11-11eb-8258-63266bda0a1a.png)
@@ -531,7 +532,7 @@ namespace MiniExcelLibs.OpenXml
                                 var newMergeCell = new XMergeCell(mergeCell);
                                 newMergeCell.Y1 = newMergeCell.Y1 + rowIndexDiff + groupingRowDiff;
                                 newMergeCell.Y2 = newMergeCell.Y2 + rowIndexDiff + groupingRowDiff;
-                                this.NewXMergeCellInfos.Add(newMergeCell);
+                                NewXMergeCellInfos.Add(newMergeCell);
                             }
 
                             // Last merge one don't add new row, or it'll get duplicate result like : https://github.com/shps951023/MiniExcel/issues/207#issuecomment-824550950
@@ -548,7 +549,7 @@ namespace MiniExcelLibs.OpenXml
                                 var _newRow = row.Clone() as XmlElement;
                                 _newRow.SetAttribute("r", mergeBaseRowIndex.ToString());
 
-                                var cs = _newRow.SelectNodes($"x:c", _ns);
+                                var cs = _newRow.SelectNodes("x:c", _ns);
                                 // all v replace by empty
                                 // TODO: remove c/v
                                 foreach (XmlElement _c in cs)
@@ -560,7 +561,7 @@ namespace MiniExcelLibs.OpenXml
                                     }
                                 }
 
-                                _newRow.InnerXml = new StringBuilder(_newRow.InnerXml).Replace($"{{{{$rowindex}}}}", mergeBaseRowIndex.ToString()).ToString();
+                                _newRow.InnerXml = new StringBuilder(_newRow.InnerXml).Replace("{{$rowindex}}", mergeBaseRowIndex.ToString()).ToString();
                                 writer.Write(CleanXml(_newRow.OuterXml, endPrefix));
                             }
                         }
@@ -570,10 +571,10 @@ namespace MiniExcelLibs.OpenXml
                 {
                     rowXml.Clear()
                         .Append(outerXmlOpen)
-                        .AppendFormat(@" r=""{0}"">", newRowIndex)
+                        .Append($@" r=""{newRowIndex}"">")
                         .Append(innerXml)
-                        .Replace($"{{{{$rowindex}}}}", newRowIndex.ToString())
-                        .AppendFormat("</{0}>", row.Name);
+                        .Replace("{{$rowindex}}", newRowIndex.ToString())
+                        .Append($"</{row.Name}>");
                     writer.Write(CleanXml(rowXml, endPrefix)); // pass StringBuilder for netcoreapp3.0 or above
 
                     //mergecells
@@ -584,7 +585,7 @@ namespace MiniExcelLibs.OpenXml
                             var newMergeCell = new XMergeCell(mergeCell);
                             newMergeCell.Y1 = newMergeCell.Y1 + rowIndexDiff + groupingRowDiff;
                             newMergeCell.Y2 = newMergeCell.Y2 + rowIndexDiff + groupingRowDiff;
-                            this.NewXMergeCellInfos.Add(newMergeCell);
+                            NewXMergeCellInfos.Add(newMergeCell);
                         }
                     }
 
@@ -596,10 +597,10 @@ namespace MiniExcelLibs.OpenXml
 
             writer.Write($"</{prefix}sheetData>");
 
-            if (this.NewXMergeCellInfos.Count != 0)
+            if (NewXMergeCellInfos.Count != 0)
             {
-                writer.Write($"<{prefix}mergeCells count=\"{this.NewXMergeCellInfos.Count}\">");
-                foreach (var cell in this.NewXMergeCellInfos)
+                writer.Write($"<{prefix}mergeCells count=\"{NewXMergeCellInfos.Count}\">");
+                foreach (var cell in NewXMergeCellInfos)
                 {
                     writer.Write(cell.ToXmlString(prefix));
                 }
@@ -760,7 +761,7 @@ namespace MiniExcelLibs.OpenXml
                     Row = row
                 };
                 XRowInfos.Add(xRowInfo);
-                foreach (XmlElement c in row.SelectNodes($"x:c", _ns))
+                foreach (XmlElement c in row.SelectNodes("x:c", _ns))
                 {
                     var r = c.GetAttribute("r");
 
@@ -778,7 +779,7 @@ namespace MiniExcelLibs.OpenXml
 
                     var v = c.SelectSingleNode("x:v", _ns);
                     var f = c.SelectSingleNode("x:f", _ns);
-                    if (v?.InnerText == null)
+                    if (v?.InnerText == null || f != null)
                         continue;
 
                     var matches = _isExpressionRegex.Matches(v.InnerText).GroupBy(x => x.Value).Select(varGroup => varGroup.First().Value).ToArray();
@@ -947,7 +948,7 @@ namespace MiniExcelLibs.OpenXml
                             else if (decimal.TryParse(cellValueStr, out var outV))
                             {
                                 c.SetAttribute("t", "n");
-                                cellValueStr = outV.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                                cellValueStr = outV.ToString(CultureInfo.InvariantCulture);
                             }
                             else switch (cellValue)
                             {
